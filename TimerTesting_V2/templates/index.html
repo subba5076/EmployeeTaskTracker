@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        .light-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .dark-mode {
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        .dark-mode img#toggleModeBtn {
+            filter: invert(100%);
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            width: 100%;
+            box-sizing: border-box;
+            transition: background-color 0.5s, border-color 0.5s;
+        }
+
+        .dark-mode .row {
+            background-color: #333;
+            border-color: #555;
+        }
+
+        .row input, .row button {
+            margin-right: 10px;
+            padding: 5px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            flex-grow: 1;
+        }
+
+        .row button {
+            flex-grow: 0;
+        }
+
+        .dark-mode .row input, .dark-mode .row button {
+            background-color: #555;
+            color: #fff;
+            border-color: #777;
+        }
+
+        #toggleModeBtn {
+            cursor: pointer;
+            margin-bottom: 20px;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 30px;
+            height: 30px;
+        }
+
+        #addRowBtn {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+            align-self: center;
+        }
+
+        #addRowBtn:hover {
+            background-color: #0056b3;
+        }
+
+        #submitBtn {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+            align-self: center;
+        }
+
+        #submitBtn:hover {
+            background-color: #218838;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="light-mode">
+    <img id="toggleModeBtn" src="https://img.icons8.com/ios-filled/50/000000/sun.png" alt="Toggle Dark Mode">
+    <h1>Task Tracker</h1>
+    <div id="container">
+        <div id="rowsContainer"></div>
+        <button id="addRowBtn">+</button>
+        <button id="submitBtn">Submit</button>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let rowCount = 0;
+
+            $('#addRowBtn').click(function() {
+                rowCount++;
+                let newRow = `
+                    <div class="row" id="row${rowCount}">
+                        <input type="text" placeholder="Name" class="name">
+                        <input type="text" placeholder="Task" class="task">
+                        <button class="startBtn" onclick="startTimer(${rowCount})">Start</button>
+                        <button class="stopBtn" onclick="stopTimer(${rowCount})">Stop</button>
+                        <div>
+                            <span class="startTime" id="startTime${rowCount}"></span>
+                            <span class="elapsedTime" id="elapsedTime${rowCount}"></span>
+                        </div>
+                    </div>
+                `;
+                $('#rowsContainer').append(newRow);
+            });
+
+            $('#toggleModeBtn').click(function() {
+                $('body').toggleClass('dark-mode light-mode');
+                let currentSrc = $('#toggleModeBtn').attr('src');
+                let newSrc = currentSrc.includes('sun') ? 
+                    'https://img.icons8.com/ios-filled/50/000000/moon-symbol.png' : 
+                    'https://img.icons8.com/ios-filled/50/000000/sun.png';
+                $('#toggleModeBtn').attr('src', newSrc);
+            });
+
+            $('#submitBtn').click(function() {
+                let rows = [];
+                $('.row').each(function() {
+                    let name = $(this).find('.name').val();
+                    let task = $(this).find('.task').val();
+                    let startTime = $(this).find('.startTime').text().replace('Start Time: ', '');
+                    let elapsedTime = $(this).find('.elapsedTime').text().replace('Elapsed Time: ', '').replace(' seconds', '');
+
+                    rows.push({
+                        name: name,
+                        task: task,
+                        start_time: startTime,
+                        elapsed_time: elapsedTime
+                    });
+                });
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/generate_csv',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ rows: rows }),
+                    success: function(response) {
+                        // Handle the CSV download
+                        let blob = new Blob([response], { type: 'text/csv' });
+                        let link = document.createElement('a');
+                        link.href = window.URL.createObjectURL(blob);
+                        link.download = 'report.csv';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            });
+        });
+
+        // Function to start timer for a specific row
+        function startTimer(rowId) {
+            let startTime = new Date(); // Get the current time
+            $(`#startTime${rowId}`).text(`Start Time: ${startTime.toLocaleTimeString()}`);
+            $(`#row${rowId}`).data('start_time', startTime);
+        }
+
+        // Function to stop timer for a specific row
+        function stopTimer(rowId) {
+            let start_time = $(`#row${rowId}`).data('start_time');
+            if (start_time) {
+                let stopTime = new Date(); // Get the current time when stopped
+                let elapsedTime = (stopTime - start_time) / 1000; // Calculate elapsed time in seconds
+                $(`#elapsedTime${rowId}`).text(`Elapsed Time: ${elapsedTime.toFixed(1)} seconds`);
+                $(`#row${rowId} .startTime`).append(`<br>Stop Time: ${stopTime.toLocaleTimeString()}`);
+            } else {
+                console.error(`Timer for row ${rowId} was not started.`);
+            }
+        }
+    </script>
+</body>
+</html>
